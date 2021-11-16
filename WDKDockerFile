@@ -1,0 +1,47 @@
+# escape=`
+
+# Use the latest Windows Server Core image with .NET Framework 4.7.1.
+ FROM mcr.microsoft.com/dotnet/framework/runtime:4.8
+
+# Download the Build Tools bootstrapper.
+ADD https://aka.ms/vs/15/release/vs_buildtools.exe C:\TEMP\vs_buildtools.exe
+
+# Install Build Tools excluding workloads and components with known issues.
+RUN C:\TEMP\vs_buildtools.exe --quiet --wait --norestart --nocache `
+--installPath C:\BuildTools `
+--all `
+--remove Microsoft.VisualStudio.Component.Windows10SDK.10240 `
+--remove Microsoft.VisualStudio.Component.Windows10SDK.10586 `
+--remove Microsoft.VisualStudio.Component.Windows10SDK.14393 `
+--remove Microsoft.VisualStudio.Component.Windows81SDK `
+|| IF "%ERRORLEVEL%"=="3010" EXIT 0
+
+# Download the WDK bootstrapper.
+ADD https://go.microsoft.com/fwlink/?linkid=873060 C:\TEMP\wdksetup.exe
+
+# Install WDK excluding WDK.vsix.
+RUN C:\TEMP\wdksetup.exe /q
+
+# Install WDK.vsix in manual manner.
+RUN copy "C:\Program Files (x86)\Windows Kits\10\Vsix\WDK.vsix" C:\TEMP\wdkvsix.zip
+RUN powershell Expand-Archive C:\TEMP\wdkvsix.zip -DestinationPath C:\TEMP\wdkvsix
+RUN robocopy /e "C:\TEMP\wdkvsix\$VCTargets\Platforms" "C:\BuildTools\Common7\IDE\VC\VCTargets\Platforms" || EXIT 0
+
+# Download GIT.
+ADD https://github.com/git-for-windows/git/releases/download/v2.18.0.windows.1/MinGit-2.18.0-64-bit.zip C:\TEMP\MinGit.zip
+RUN powershell Expand-Archive C:\TEMP\MinGit.zip -DestinationPath C:\MinGit
+
+# Clone Windows-driver-samples git repo.
+RUN C:\MinGit\cmd\git.exe clone https://github.com/Microsoft/Windows-driver-samples.git
+
+# Start developer command prompt with any other commands specified.
+ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
+
+# Default to PowerShell if no other command specified.
+CMD ["powershell.exe", "-NoLogo", "-ExecutionPolicy", "Bypass"]
+
+# Start developer command prompt with any other commands specified.
+ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
+
+# Default to PowerShell if no other command specified.
+CMD ["powershell.exe", "-NoLogo", "-ExecutionPolicy", "Bypass"]
